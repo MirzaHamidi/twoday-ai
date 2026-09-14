@@ -6,3 +6,5 @@ twoday-ai.db
 twoday-ai.db-shm
 twoday-ai.db-wal
 .migration/
+images/
+.vscode/
