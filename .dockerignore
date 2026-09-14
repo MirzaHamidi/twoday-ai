@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+.git/
+.gitignore
+.env
+.env.*
+twoday-ai.db
+twoday-ai.db-shm
+twoday-ai.db-wal
+.migration/
+Dockerfile.migrate
+README-BUNNY.md

@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+.git/
+.gitignore
+.env
+.env.*
+twoday-ai.db-shm
+twoday-ai.db-wal
+README-BUNNY.md
