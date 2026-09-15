@@ -21,6 +21,16 @@ const int SUMMARIZE_EVERY_HUMAN_MESSAGES = 60;
 const int PENDING_ACTION_EXPIRY_MINUTES = 15;
 const string DATABASE_FILE = "twoday-ai.db";
 
+// ======================================================
+// TELEGRAM HTML5 GAMES
+// ======================================================
+
+const string ONE_TWO_DICE_SHORTNAME = "otdice";
+const string ONE_TWO_DICE_URL = "https://twodaystudio.com/Games/OneTwoDice/index.html";
+
+const string HOOP_PONG_SHORTNAME = "hooppong";
+const string HOOP_PONG_URL = "https://twodaystudio.com/Games/HoopPong/index.html";
+
 string[] BUILD_FEATURES =
 [
     "Web araştırması başlamadan önce tahmini maliyet + kullanıcı onayı",
@@ -162,7 +172,11 @@ catch (Exception ex)
 
 ReceiverOptions receiverOptions = new()
 {
-    AllowedUpdates = [UpdateType.Message]
+    AllowedUpdates =
+    [
+        UpdateType.Message,
+        UpdateType.CallbackQuery
+    ]
 };
 
 telegram.StartReceiving(
@@ -192,6 +206,14 @@ async Task HandleUpdateAsync(
     Update update,
     CancellationToken cancellationToken)
 {
+    // Telegram HTML5 game Play buttons arrive as CallbackQuery updates.
+    // Handle them separately so the existing AI/message flow below stays untouched.
+    if (update.CallbackQuery is { } callbackQuery)
+    {
+        await HandleGameCallbackAsync(bot, callbackQuery, cancellationToken);
+        return;
+    }
+
     if (update.Message is not { } message)
         return;
 
@@ -253,6 +275,31 @@ async Task HandleUpdateAsync(
     try
     {
         string normalized = NormalizeCommandText(text);
+
+        // ---------------- TELEGRAM HTML5 GAMES ----------------
+        if (normalized is "/games" or "games" or "oyunlar")
+        {
+            await SendGamesAsync(bot, chatId, cancellationToken);
+            return;
+        }
+
+        if (normalized is "/otdice" or "otdice")
+        {
+            await bot.SendGame(
+                chatId: chatId,
+                gameShortName: ONE_TWO_DICE_SHORTNAME,
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        if (normalized is "/hooppong" or "hooppong")
+        {
+            await bot.SendGame(
+                chatId: chatId,
+                gameShortName: HOOP_PONG_SHORTNAME,
+                cancellationToken: cancellationToken);
+            return;
+        }
 
         // ---------------- BUDGET COMMANDS ----------------
         if (normalized is "/budget" or "budget")
@@ -444,6 +491,72 @@ async Task HandleUpdateAsync(
     {
         chatLock.Release();
     }
+}
+
+// ======================================================
+// TELEGRAM HTML5 GAMES
+// ======================================================
+
+async Task HandleGameCallbackAsync(
+    ITelegramBotClient bot,
+    CallbackQuery callbackQuery,
+    CancellationToken cancellationToken)
+{
+    string? gameShortName = callbackQuery.GameShortName;
+
+    if (string.IsNullOrWhiteSpace(gameShortName))
+    {
+        await bot.AnswerCallbackQuery(
+            callbackQueryId: callbackQuery.Id,
+            cancellationToken: cancellationToken);
+        return;
+    }
+
+    string? gameUrl = gameShortName switch
+    {
+        ONE_TWO_DICE_SHORTNAME => ONE_TWO_DICE_URL,
+        HOOP_PONG_SHORTNAME => HOOP_PONG_URL,
+        _ => null
+    };
+
+    if (gameUrl == null)
+    {
+        await bot.AnswerCallbackQuery(
+            callbackQueryId: callbackQuery.Id,
+            text: "Bu oyun bu bota bağlı değil.",
+            showAlert: true,
+            cancellationToken: cancellationToken);
+        return;
+    }
+
+    Console.WriteLine(
+        $"GAME > {GetSenderName(callbackQuery.From)} opened {gameShortName}");
+
+    await bot.AnswerCallbackQuery(
+        callbackQueryId: callbackQuery.Id,
+        url: gameUrl,
+        cancellationToken: cancellationToken);
+}
+
+async Task SendGamesAsync(
+    ITelegramBotClient bot,
+    long chatId,
+    CancellationToken cancellationToken)
+{
+    await bot.SendMessage(
+        chatId: chatId,
+        text: "🎮 TwoDay Studio Games\n\nOyunu seç ve Play butonuna bas:",
+        cancellationToken: cancellationToken);
+
+    await bot.SendGame(
+        chatId: chatId,
+        gameShortName: ONE_TWO_DICE_SHORTNAME,
+        cancellationToken: cancellationToken);
+
+    await bot.SendGame(
+        chatId: chatId,
+        gameShortName: HOOP_PONG_SHORTNAME,
+        cancellationToken: cancellationToken);
 }
 
 // ======================================================
